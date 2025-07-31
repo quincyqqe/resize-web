@@ -138,10 +138,10 @@ class WindowCreator {
     <span>Window ${this.windowCount + 1}</span>
     <div class="window-controls">
       <button class="window-maximize" onclick="windowCreator.maximizeWindow('${windowId}')">
-        <img src="/images/maximize.svg" alt="Maximize" width="16" height="16" />
+        <img src="images/maximize.svg" alt="Maximize" width="16" height="16" />
       </button>
       <button class="window-close" onclick="windowCreator.closeWindow('${windowId}')">
-        <img src="/images/close.svg" alt="Close" width="16" height="16" />
+        <img src="images/close.svg" alt="Close" width="16" height="16" />
       </button>
     </div>
   </div>
