@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resize web</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="sidebar">
+      <div class="tool-group">
+        <h3>Window Color</h3>
+        <input
+          type="color"
+          class="color-picker"
+          id="windowColor"
+          value="black"
+        />
+      </div>
+
+      <div class="tool-group">
+        <h3>Virtual Size</h3>
+        <select id="virtualSize" class="tool-select">
+          <option value="4k">4K (3840×2160)</option>
+          <option value="2k">2K (2560×1440)</option>
+        </select>
+      </div>
+
+      <div class="tool-group">
+        <button class="tool-btn" id="clearAll">Reset All</button>
+      </div>
+    </div>
+
+    <div class="canvas-area" id="canvas">
+      <div class="selection-box" id="selectionBox"></div>
+    </div>
+    <script src="/js/window-creator.js"></script>
+  </body>
+</html>
