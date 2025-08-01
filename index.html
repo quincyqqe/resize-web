@@ -2,38 +2,93 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Resize web</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/tabs.css" />
   </head>
   <body>
-    <div class="sidebar">
-      <div class="tool-group">
-        <h3>Window Color</h3>
-        <input
-          type="color"
-          class="color-picker"
-          id="windowColor"
-          value="black"
-        />
+    <header>
+      <div class="tabs">
+        <div class="tab active" data-tab="video-wall">Video Wall</div>
+        <div class="tab" data-tab="io-settings">Input/Output Settings</div>
+        <div class="tab" data-tab="system-settings">System Settings</div>
+      </div>
+    </header>
+
+    <main>
+      <div class="tab-content active" id="video-wall">
+        <div class="wall-wrapper">
+          <div class="sidebar">
+            <div class="tool-group">
+              <h3>Wall Configuration</h3>
+              <select id="virtualSize" class="tool-select">
+                <option value="4k">4K (3840×2160)</option>
+                <option value="2k">2K (2560×1440)</option>
+              </select>
+
+              <div class="wall-config">
+                <div class="config-row">
+                  <label>Rows:</label>
+                  <input
+                    type="number"
+                    id="wallRows"
+                    class="config-input"
+                    min="1"
+                    max="8"
+                    value="1"
+                  />
+                </div>
+                <div class="config-row">
+                  <label>Columns:</label>
+                  <input
+                    type="number"
+                    id="wallCols"
+                    class="config-input"
+                    min="1"
+                    max="8"
+                    value="1"
+                  />
+                </div>
+              </div>
+
+              <div class="outputs-info" id="outputsCount">Outputs: 1/8</div>
+            </div>
+
+            <div class="tool-group">
+              <button class="tool-btn" id="clearAll">Reset All</button>
+            </div>
+
+            <div class="tool-group">
+              <h3>Input Selection</h3>
+              <div class="input-buttons">
+                <button class="input-btn" data-input="1">Input 1</button>
+                <button class="input-btn" data-input="2">Input 2</button>
+                <button class="input-btn" data-input="3">Input 3</button>
+                <button class="input-btn" data-input="4">Input 4</button>
+                <button class="input-btn" data-input="5">Input 5</button>
+                <button class="input-btn" data-input="6">Input 6</button>
+                <button class="input-btn" data-input="7">Input 7</button>
+                <button class="input-btn" data-input="8">Input 8</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="canvas-area" id="canvas">
+            <div class="selection-box" id="selectionBox"></div>
+          </div>
+        </div>
       </div>
 
-      <div class="tool-group">
-        <h3>Virtual Size</h3>
-        <select id="virtualSize" class="tool-select">
-          <option value="4k">4K (3840×2160)</option>
-          <option value="2k">2K (2560×1440)</option>
-        </select>
+      <div class="tab-content" id="io-settings">
+        <div class="placeholder">input/output settings</div>
       </div>
 
-      <div class="tool-group">
-        <button class="tool-btn" id="clearAll">Reset All</button>
+      <div class="tab-content" id="system-settings">
+        <div class="placeholder">video wall settings</div>
       </div>
-    </div>
+    </main>
 
-    <div class="canvas-area" id="canvas">
-      <div class="selection-box" id="selectionBox"></div>
-    </div>
-    <script src="js/window-creator.js"></script>
+    <script type="module" src="js/main.js"></script>
   </body>
 </html>

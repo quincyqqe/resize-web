@@ -1,9 +1,10 @@
-class WindowCreator {
+export class WindowCreator {
   constructor() {
     this.canvas = document.getElementById("canvas");
     this.selectionBox = document.getElementById("selectionBox");
     this.windowCount = 0;
     this.currentMode = "create";
+    this.currentInput = "Input 1";
     this.isSelecting = false;
     this.startX = 0;
     this.startY = 0;
@@ -13,6 +14,8 @@ class WindowCreator {
       "2k": { width: 2560, height: 1440 },
     };
     this.currentResolution = "4k";
+    this.totalVirtualWidth = 3840; // Default 1x 4K
+    this.totalVirtualHeight = 2160;
 
     this.init();
   }
@@ -20,6 +23,15 @@ class WindowCreator {
   init() {
     this.setupEventListeners();
     this.updateWindowCount();
+
+    // Добавляем слушатели на кнопки input-btn
+    document.querySelectorAll(".input-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.selectInput(btn.dataset.input);
+      });
+    });
+
+    this.highlightSelectedInput();
   }
 
   setupEventListeners() {
@@ -46,6 +58,51 @@ class WindowCreator {
     this.canvas.addEventListener("mouseup", (e) => {
       if (this.isSelecting) {
         this.endSelection(e);
+      }
+    });
+  }
+
+  createOutput(x, y, width, height, index) {
+    const outputEl = document.createElement("div");
+    outputEl.className = "output-block";
+    outputEl.style.position = "absolute";
+    outputEl.style.left = x + "px";
+    outputEl.style.top = y + "px";
+    outputEl.style.width = width + "px";
+    outputEl.style.height = height + "px";
+    outputEl.style.border = "1px solid #333";
+    outputEl.style.background = "transparent";
+    outputEl.style.display = "flex";
+    outputEl.style.justifyContent = "center";
+    outputEl.style.alignItems = "center";
+    outputEl.style.color = "#333";
+    outputEl.style.fontSize = "18px";
+    outputEl.style.userSelect = "none";
+    outputEl.textContent = `Output ${index}`;
+    outputEl.style.zIndex = 1;
+
+    this.canvas.appendChild(outputEl);
+    this.windows.push(outputEl);
+    this.windowCount++;
+    this.updateWindowCount();
+  }
+
+  setVirtualSize(width, height) {
+    this.totalVirtualWidth = width;
+    this.totalVirtualHeight = height;
+  }
+
+  selectInput(inputNumber) {
+    this.currentInput = `Input ${inputNumber}`;
+    this.highlightSelectedInput();
+  }
+
+  highlightSelectedInput() {
+    document.querySelectorAll(".input-btn").forEach((btn) => {
+      if (`Input ${btn.dataset.input}` === this.currentInput) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
       }
     });
   }
@@ -121,8 +178,8 @@ class WindowCreator {
 
   createWindow(x, y, width, height) {
     const windowId = "window_" + Date.now();
-    const windowColor = document.getElementById("windowColor").value;
-    const backgroundColor = this.hexToRgba(windowColor, 0.4);
+
+    const backgroundColor = this.hexToRgba("#000000", 0.4);
 
     const windowEl = document.createElement("div");
     windowEl.className = "window";
@@ -132,22 +189,26 @@ class WindowCreator {
     windowEl.style.width = width + "px";
     windowEl.style.height = height + "px";
     windowEl.style.background = backgroundColor;
+    windowEl.style.zIndex = 1000;
+
+    // Добавляем data-атрибут с выбранным Input
+    windowEl.dataset.input = this.currentInput;
 
     windowEl.innerHTML = `
-  <div class="window-header">
-    <span>Window ${this.windowCount + 1}</span>
-    <div class="window-controls">
-      <button class="window-maximize" onclick="windowCreator.maximizeWindow('${windowId}')">
-        <img src="images/maximize.svg" alt="Maximize" width="16" height="16" />
-      </button>
-      <button class="window-close" onclick="windowCreator.closeWindow('${windowId}')">
-        <img src="images/close.svg" alt="Close" width="16" height="16" />
-      </button>
-    </div>
-  </div>
-  <div class="window-info" id="info_${windowId}"></div>
-  <div class="resize-handle"></div>
-`;
+      <div class="window-header">
+        <span>${this.currentInput} - Window ${this.windowCount + 1}</span>
+        <div class="window-controls">
+          <button class="window-maximize" onclick="windowCreator.maximizeWindow('${windowId}')">
+            <img src="images/maximize.svg" alt="Maximize" width="16" height="16" />
+          </button>
+          <button class="window-close" onclick="windowCreator.closeWindow('${windowId}')">
+            <img src="images/close.svg" alt="Close" width="16" height="16" />
+          </button>
+        </div>
+      </div>
+      <div class="window-info" id="info_${windowId}"></div>
+      <div class="resize-handle"></div>
+    `;
 
     this.canvas.appendChild(windowEl);
     this.windows.push(windowId);
@@ -270,9 +331,14 @@ class WindowCreator {
   }
 
   clearAllWindows() {
-    this.windows.forEach((windowId) => {
-      const windowEl = document.getElementById(windowId);
-      if (windowEl) windowEl.remove();
+    this.windows.forEach((el) => {
+      if (el instanceof HTMLElement) {
+        el.remove();
+      } else if (typeof el === "string") {
+        // старые окна по id
+        const windowEl = document.getElementById(el);
+        if (windowEl) windowEl.remove();
+      }
     });
     this.windows = [];
     this.windowCount = 0;
@@ -317,14 +383,11 @@ class WindowCreator {
     const infoEl = windowEl.querySelector(".window-info");
     if (!infoEl) return;
 
-    const canvasRect = this.canvas.getBoundingClientRect();
-    const virtualRes = this.virtualResolutions[this.currentResolution];
-
     const canvasWidth = this.canvas.clientWidth;
     const canvasHeight = this.canvas.clientHeight;
 
-    const scaleX = virtualRes.width / canvasWidth;
-    const scaleY = virtualRes.height / canvasHeight;
+    const scaleX = this.totalVirtualWidth / canvasWidth;
+    const scaleY = this.totalVirtualHeight / canvasHeight;
 
     const windowLeft = Number.parseFloat(windowEl.style.left);
     const windowTop = Number.parseFloat(windowEl.style.top);
@@ -342,5 +405,3 @@ class WindowCreator {
   `;
   }
 }
-
-const windowCreator = new WindowCreator();
