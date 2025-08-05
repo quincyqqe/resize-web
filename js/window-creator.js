@@ -1,174 +1,106 @@
+import { VIRTUAL_RESOLUTIONS, INPUT_COLORS } from "./constants.js"
+import { calculateVirtualPosition, calculateVirtualSize, getOutputAtPosition } from "./utils.js"
+
 export class WindowCreator {
   constructor() {
-    this.canvas = document.getElementById("canvas");
-    this.selectionBox = document.getElementById("selectionBox");
-    this.windowCount = 0;
-    this.currentMode = "create";
-    this.currentInput = "Input 1";
-    this.isSelecting = false;
-    this.startX = 0;
-    this.startY = 0;
-    this.windows = [];
-    this.isDragging = false;
-    this.inputs = {
-      "Input 1": {
-        windowCount: 0,
-        color: "#000000",
-        windows: [],
-      },
-      "Input 2": {
-        windowCount: 0,
-        color: "#e7873a80",
-        windows: [],
-      },
-      "Input 3": {
-        windowCount: 0,
-        color: "#67aa1480",
-        windows: [],
-      },
-      "Input 4": {
-        windowCount: 0,
-        color: "#a319d280",
-        windows: [],
-      },
-      "Input 5": {
-        windowCount: 0,
-        color: "#1a25f180",
-        windows: [],
-      },
-      "Input 6": {
-        windowCount: 0,
-        color: "#c3848c80",
-        windows: [],
-      },
-      "Input 7": {
-        windowCount: 0,
-        color: "#2d713880",
-        windows: [],
-      },
-      "Input 8": {
-        windowCount: 0,
-        color: "#bebd7680",
-        windows: [],
-      },
-    };
-    this.virtualResolutions = {
-      "4k": { width: 3840, height: 2160 },
-      "2k": { width: 2560, height: 1440 },
-    };
-    this.currentResolution = "4k";
-    this.totalVirtualWidth = 3840; // Default 1x 4K
-    this.totalVirtualHeight = 2160;
+    this.canvas = document.getElementById("canvas")
+    this.selectionBox = document.getElementById("selectionBox")
+    this.windows = [] // Stores all window info objects
+    this.currentMode = "create"
+    this.currentInput = "Input 1"
+    this.isSelecting = false
+    this.startX = 0
+    this.startY = 0
+    this.isDragging = false
+    this.inputs = Object.keys(INPUT_COLORS).reduce((acc, key) => {
+      acc[key] = { color: INPUT_COLORS[key].color, windows: [] }
+      return acc
+    }, {})
 
-    this.wallRows = 1;
-    this.wallCols = 1;
-    this.outputVirtualWidth = 3840;
-    this.outputVirtualHeight = 2160;
+    this.totalVirtualWidth = VIRTUAL_RESOLUTIONS["4k"].width
+    this.totalVirtualHeight = VIRTUAL_RESOLUTIONS["4k"].height
+    this.wallRows = 1
+    this.wallCols = 1
+    this.outputVirtualWidth = VIRTUAL_RESOLUTIONS["4k"].width
+    this.outputVirtualHeight = VIRTUAL_RESOLUTIONS["4k"].height
 
-    this.init();
+    this.init()
   }
 
   init() {
-    this.setupEventListeners();
-    this.updateWindowCount();
+    this.setupEventListeners()
+    this.updateGlobalWindowNumbers()
 
     document.querySelectorAll(".input-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        this.selectInput(btn.dataset.input);
-      });
-    });
+        this.selectInput(btn.dataset.input)
+      })
+    })
 
-    this.highlightSelectedInput();
-    this.setupDragAndDrop();
+    this.highlightSelectedInput()
+    this.setupDragAndDrop()
   }
 
   setupDragAndDrop() {
     document.querySelectorAll(".input-btn").forEach((btn) => {
       btn.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("text/plain", btn.dataset.input);
-        e.dataTransfer.effectAllowed = "copy";
-        btn.style.opacity = "0.5";
-        this.isDragging = true;
-      });
+        e.dataTransfer.setData("text/plain", btn.dataset.input)
+        e.dataTransfer.effectAllowed = "copyLink"
+        btn.style.opacity = "0.5"
+        this.isDragging = true
+      })
 
-      btn.addEventListener("dragend", (e) => {
-        btn.style.opacity = "1";
-        this.isDragging = false;
-
+      btn.addEventListener("dragend", () => {
+        btn.style.opacity = "1"
+        this.isDragging = false
         document.querySelectorAll(".output-block").forEach((output) => {
-          output.classList.remove("drag-over");
-        });
-      });
-    });
+          output.classList.remove("drag-over")
+        })
+      })
+    })
 
     this.canvas.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
-
+      e.preventDefault()
+      e.dataTransfer.dropEffect = "copy"
       if (this.isDragging) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        const targetOutput = this.getOutputAtPosition(x, y);
-
+        const rect = this.canvas.getBoundingClientRect()
+        const x = e.clientX - rect.left
+        const y = e.clientY - rect.top
+        const targetOutput = getOutputAtPosition(x, y, this.canvas)
         document.querySelectorAll(".output-block").forEach((output) => {
-          output.classList.remove("drag-over");
-        });
-
+          output.classList.remove("drag-over")
+        })
         if (targetOutput) {
-          targetOutput.classList.add("drag-over");
+          targetOutput.classList.add("drag-over")
         }
       }
-    });
+    })
 
     this.canvas.addEventListener("drop", (e) => {
-      e.preventDefault();
+      e.preventDefault()
+      const inputNumber = e.dataTransfer.getData("text/plain")
+      const targetWindowEl = e.target.closest(".window")
 
-      const inputNumber = e.dataTransfer.getData("text/plain");
-
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      const targetOutput = this.getOutputAtPosition(x, y);
-
-      if (targetOutput) {
-        this.createWindowOnOutput(targetOutput, inputNumber);
+      if (targetWindowEl) {
+        // Dropped on an existing window
+        this.handleWindowDrop(targetWindowEl, inputNumber)
+      } else {
+        // Dropped on canvas or output block (create new window)
+        const rect = this.canvas.getBoundingClientRect()
+        const x = e.clientX - rect.left
+        const y = e.clientY - rect.top
+        const targetOutput = getOutputAtPosition(x, y, this.canvas)
+        if (targetOutput) {
+          this.createWindowOnOutput(targetOutput, inputNumber, e)
+        }
       }
-
       document.querySelectorAll(".output-block").forEach((output) => {
-        output.classList.remove("drag-over");
-      });
-    });
+        output.classList.remove("drag-over")
+      })
+    })
   }
 
-  getOutputAtPosition(x, y) {
-    const outputs = document.querySelectorAll(".output-block");
-
-    for (const output of outputs) {
-      const outputRect = output.getBoundingClientRect();
-      const canvasRect = this.canvas.getBoundingClientRect();
-
-      const outputX = outputRect.left - canvasRect.left;
-      const outputY = outputRect.top - canvasRect.top;
-      const outputWidth = outputRect.width;
-      const outputHeight = outputRect.height;
-
-      if (
-        x >= outputX &&
-        x <= outputX + outputWidth &&
-        y >= outputY &&
-        y <= outputY + outputHeight
-      ) {
-        return output;
-      }
-    }
-
-    return null;
-  }
-
-  createWindowOnOutput(outputEl, inputNumber) {
+   createWindowOnOutput(outputEl, inputNumber) {
     const input = `Input ${inputNumber}`;
 
     const outputRect = outputEl.getBoundingClientRect();
@@ -185,265 +117,287 @@ export class WindowCreator {
     this.highlightSelectedInput();
   }
 
+
+
+  handleWindowDrop(targetWindowEl, inputNumber) {
+    const oldInput = targetWindowEl.dataset.input
+    const newInput = `Input ${inputNumber}`
+
+    if (oldInput === newInput) {
+      return // No change needed if dropping the same input
+    }
+
+    const windowId = targetWindowEl.id
+    let windowInfoToMove = null
+
+    // Find and remove windowInfo from old input's array
+    this.inputs[oldInput].windows = this.inputs[oldInput].windows.filter((win) => {
+      if (win.id === windowId) {
+        windowInfoToMove = win
+        return false
+      }
+      return true
+    })
+
+    if (!windowInfoToMove) {
+      console.error("Window info not found for ID:", windowId)
+      return
+    }
+
+    // Update window element properties
+    targetWindowEl.dataset.input = newInput
+    targetWindowEl.style.background = this.inputs[newInput].color
+    targetWindowEl.querySelector(".window-header span").textContent = newInput
+
+    // Update the windowInfo's input property
+    windowInfoToMove.input = newInput
+
+    // Add windowInfo to new input's array
+    this.inputs[newInput].windows.push(windowInfoToMove)
+
+    this.updateWindowInfo(targetWindowEl)
+    this.updateGlobalWindowNumbers() // Re-number all windows
+  }
+
   setupEventListeners() {
     this.canvas.addEventListener("mousedown", (e) => {
-      if (
-        this.currentMode === "create" &&
-        e.target === this.canvas &&
-        !this.isDragging
-      ) {
-        this.startSelection(e);
+      if (this.currentMode === "create" && e.target === this.canvas && !this.isDragging) {
+        this.startSelection(e)
       }
-    });
+    })
 
     this.canvas.addEventListener("mousemove", (e) => {
       if (this.isSelecting) {
-        this.updateSelection(e);
+        this.updateSelection(e)
       }
-    });
+    })
 
     this.canvas.addEventListener("mouseup", (e) => {
       if (this.isSelecting) {
-        this.endSelection(e);
+        this.endSelection(e)
       }
-    });
+    })
   }
 
   setVirtualSize(width, height) {
-    this.totalVirtualWidth = width;
-    this.totalVirtualHeight = height;
+    this.totalVirtualWidth = width
+    this.totalVirtualHeight = height
   }
 
   setWallConfig(rows, cols, outputW, outputH) {
-    this.wallRows = rows;
-    this.wallCols = cols;
-    this.outputVirtualWidth = outputW;
-    this.outputVirtualHeight = outputH;
+    this.wallRows = rows
+    this.wallCols = cols
+    this.outputVirtualWidth = outputW
+    this.outputVirtualHeight = outputH
   }
 
   redrawWallOutputs() {
-    document.querySelectorAll(".output-block").forEach((el) => el.remove());
+    document.querySelectorAll(".output-block").forEach((el) => el.remove())
 
-    const canvas = this.canvas;
-    const canvasW = canvas.clientWidth;
-    const canvasH = canvas.clientHeight;
+    const canvasW = this.canvas.clientWidth
+    const canvasH = this.canvas.clientHeight
 
     if (canvasW === 0 || canvasH === 0) {
-      return;
+      return
     }
 
-    const scaleX = canvasW / this.totalVirtualWidth;
-    const scaleY = canvasH / this.totalVirtualHeight;
+    const scaleX = canvasW / this.totalVirtualWidth
+    const scaleY = canvasH / this.totalVirtualHeight
 
-    let outputIndex = 1;
+    let outputIndex = 1
     for (let row = 0; row < this.wallRows; row++) {
       for (let col = 0; col < this.wallCols; col++) {
-        const x = col * this.outputVirtualWidth * scaleX;
-        const y = row * this.outputVirtualHeight * scaleY;
-        const w = this.outputVirtualWidth * scaleX;
-        const h = this.outputVirtualHeight * scaleY;
-
-        this.createOutputElement(x, y, w, h, outputIndex);
-        outputIndex++;
+        const x = col * this.outputVirtualWidth * scaleX
+        const y = row * this.outputVirtualHeight * scaleY
+        const w = this.outputVirtualWidth * scaleX
+        const h = this.outputVirtualHeight * scaleY
+        this.createOutputElement(x, y, w, h, outputIndex)
+        outputIndex++
       }
     }
   }
 
   createOutputElement(x, y, width, height, index) {
-    const outputEl = document.createElement("div");
-    outputEl.className = "output-block";
-    outputEl.style.position = "absolute";
-    outputEl.style.left = x + "px";
-    outputEl.style.top = y + "px";
-    outputEl.style.width = width + "px";
-    outputEl.style.height = height + "px";
-    outputEl.style.border = "1px solid #333";
-    outputEl.style.background = "transparent";
-    outputEl.style.display = "flex";
-    outputEl.style.flexDirection = "column";
-    outputEl.style.color = "#333";
-    outputEl.style.fontSize = "18px";
-    outputEl.style.userSelect = "none";
-    outputEl.style.zIndex = 1;
-    outputEl.style.overflow = "hidden";
+    const outputEl = document.createElement("div")
+    outputEl.className = "output-block"
+    outputEl.style.position = "absolute"
+    outputEl.style.left = x + "px"
+    outputEl.style.top = y + "px"
+    outputEl.style.width = width + "px"
+    outputEl.style.height = height + "px"
+    outputEl.style.border = "1px solid #333"
+    outputEl.style.background = "transparent"
+    outputEl.style.display = "flex"
+    outputEl.style.flexDirection = "column"
+    outputEl.style.color = "#333"
+    outputEl.style.fontSize = "18px"
+    outputEl.style.userSelect = "none"
+    outputEl.style.zIndex = 1
+    outputEl.style.overflow = "hidden"
 
-    // Header for the output block
-    const header = document.createElement("div");
-    header.style.padding = "6px";
-    header.style.textAlign = "center";
-    header.textContent = `Output ${index}`;
-    header.style.zIndex = 2;
-    header.style.position = "relative";
+    const header = document.createElement("div")
+    header.style.padding = "6px"
+    header.style.textAlign = "center"
+    header.textContent = `Output ${index}`
+    header.style.zIndex = 2
+    header.style.position = "relative"
 
-    const gridOverlay = document.createElement("div");
-    gridOverlay.style.position = "absolute";
-    gridOverlay.style.top = "0";
-    gridOverlay.style.left = "0";
-    gridOverlay.style.width = "100%";
-    gridOverlay.style.height = "100%";
-    gridOverlay.style.display = "grid";
-    gridOverlay.style.gridTemplateColumns = "1fr 1fr";
-    gridOverlay.style.gridTemplateRows = "1fr 1fr";
-    gridOverlay.style.zIndex = 1;
+    const gridOverlay = document.createElement("div")
+    gridOverlay.style.position = "absolute"
+    gridOverlay.style.top = "0"
+    gridOverlay.style.left = "0"
+    gridOverlay.style.width = "100%"
+    gridOverlay.style.height = "100%"
+    gridOverlay.style.display = "grid"
+    gridOverlay.style.gridTemplateColumns = "1fr 1fr"
+    gridOverlay.style.gridTemplateRows = "1fr 1fr"
+    gridOverlay.style.zIndex = 1
 
     for (let i = 0; i < 4; i++) {
-      const cell = document.createElement("div");
-
-      const row = Math.floor(i / 2);
-      const col = i % 2;
-
-      const borders = [];
-      if (col === 0) borders.push("borderRight");
-      if (row === 0) borders.push("borderBottom");
-
-      cell.style.border = "none";
+      const cell = document.createElement("div")
+      const row = Math.floor(i / 2)
+      const col = i % 2
+      const borders = []
+      if (col === 0) borders.push("borderRight")
+      if (row === 0) borders.push("borderBottom")
+      cell.style.border = "none"
       borders.forEach((border) => {
-        cell.style[border] = "1px dashed rgba(51, 51, 51, 0.5)";
-      });
-
-      gridOverlay.appendChild(cell);
+        cell.style[border] = "1px dashed rgba(51, 51, 51, 0.5)"
+      })
+      gridOverlay.appendChild(cell)
     }
 
-    outputEl.appendChild(header);
-    outputEl.appendChild(gridOverlay);
-    this.canvas.appendChild(outputEl);
+    outputEl.appendChild(header)
+    outputEl.appendChild(gridOverlay)
+    this.canvas.appendChild(outputEl)
   }
 
   redrawWindows() {
-    const canvas = this.canvas;
-    const canvasW = canvas.clientWidth;
-    const canvasH = canvas.clientHeight;
+    const canvasW = this.canvas.clientWidth
+    const canvasH = this.canvas.clientHeight
 
     if (canvasW === 0 || canvasH === 0) {
-      return;
+      return
     }
 
-    const scaleX = canvasW / this.totalVirtualWidth;
-    const scaleY = canvasH / this.totalVirtualHeight;
+    const scaleX = canvasW / this.totalVirtualWidth
+    const scaleY = canvasH / this.totalVirtualHeight
 
-    for (const inputKey in this.inputs) {
-      this.inputs[inputKey].windows.forEach((windowInfo) => {
-        const windowEl = document.getElementById(windowInfo.id);
-        if (windowEl) {
-          const newLeft = windowInfo.virtualPosition.x * scaleX;
-          const newTop = windowInfo.virtualPosition.y * scaleY;
-          const newWidth = windowInfo.virtualSize.width * scaleX;
-          const newHeight = windowInfo.virtualSize.height * scaleY;
+    this.windows.forEach((windowInfo) => {
+      const windowEl = document.getElementById(windowInfo.id)
+      if (windowEl) {
+        const newLeft = windowInfo.virtualPosition.x * scaleX
+        const newTop = windowInfo.virtualPosition.y * scaleY
+        const newWidth = windowInfo.virtualSize.width * scaleX
+        const newHeight = windowInfo.virtualSize.height * scaleY
 
-          windowEl.style.left = newLeft + "px";
-          windowEl.style.top = newTop + "px";
-          windowEl.style.width = newWidth + "px";
-          windowEl.style.height = newHeight + "px";
+        windowEl.style.left = newLeft + "px"
+        windowEl.style.top = newTop + "px"
+        windowEl.style.width = newWidth + "px"
+        windowEl.style.height = newHeight + "px"
 
-          this.updateWindowInfo(windowEl);
-        }
-      });
-    }
+        this.updateWindowInfo(windowEl)
+      }
+    })
   }
 
   selectInput(inputNumber) {
-    this.currentInput = `Input ${inputNumber}`;
-    this.highlightSelectedInput();
+    this.currentInput = `Input ${inputNumber}`
+    this.highlightSelectedInput()
   }
 
   highlightSelectedInput() {
     document.querySelectorAll(".input-btn").forEach((btn) => {
       if (`Input ${btn.dataset.input}` === this.currentInput) {
-        btn.classList.add("active");
+        btn.classList.add("active")
       } else {
-        btn.classList.remove("active");
+        btn.classList.remove("active")
       }
-    });
+    })
   }
 
   setMode(mode) {
-    this.currentMode = mode;
-
+    this.currentMode = mode
     document.querySelectorAll(".tool-btn").forEach((btn) => {
-      btn.classList.remove("active");
-    });
-
+      btn.classList.remove("active")
+    })
     if (mode === "create") {
-      document.getElementById("createMode").classList.add("active");
-      this.canvas.style.cursor = "crosshair";
+      document.getElementById("createMode").classList.add("active")
+      this.canvas.style.cursor = "crosshair"
     } else {
-      document.getElementById("selectMode").classList.add("active");
-      this.canvas.style.cursor = "default";
+      document.getElementById("selectMode").classList.add("active")
+      this.canvas.style.cursor = "default"
     }
   }
 
   changeResolution(newResolution) {
-    this.clearAllWindows();
-    this.currentResolution = newResolution;
+    this.clearAllWindows()
+    this.currentResolution = newResolution
   }
 
   startSelection(e) {
-    this.isSelecting = true;
-    const rect = this.canvas.getBoundingClientRect();
-    this.startX = e.clientX - rect.left;
-    this.startY = e.clientY - rect.top;
+    this.isSelecting = true
+    const rect = this.canvas.getBoundingClientRect()
+    this.startX = e.clientX - rect.left
+    this.startY = e.clientY - rect.top
 
-    this.selectionBox.style.left = this.startX + "px";
-    this.selectionBox.style.top = this.startY + "px";
-    this.selectionBox.style.width = "0px";
-    this.selectionBox.style.height = "0px";
-    this.selectionBox.style.display = "block";
+    this.selectionBox.style.left = this.startX + "px"
+    this.selectionBox.style.top = this.startY + "px"
+    this.selectionBox.style.width = "0px"
+    this.selectionBox.style.height = "0px"
+    this.selectionBox.style.display = "block"
   }
 
   updateSelection(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const rect = this.canvas.getBoundingClientRect()
+    const currentX = e.clientX - rect.left
+    const currentY = e.clientY - rect.top
 
-    const width = Math.abs(currentX - this.startX);
-    const height = Math.abs(currentY - this.startY);
-    const left = Math.min(currentX, this.startX);
-    const top = Math.min(currentY, this.startY);
+    const width = Math.abs(currentX - this.startX)
+    const height = Math.abs(currentY - this.startY)
+    const left = Math.min(currentX, this.startX)
+    const top = Math.min(currentY, this.startY)
 
-    this.selectionBox.style.left = left + "px";
-    this.selectionBox.style.top = top + "px";
-    this.selectionBox.style.width = width + "px";
-    this.selectionBox.style.height = height + "px";
+    this.selectionBox.style.left = left + "px"
+    this.selectionBox.style.top = top + "px"
+    this.selectionBox.style.width = width + "px"
+    this.selectionBox.style.height = height + "px"
   }
 
   endSelection(e) {
-    this.isSelecting = false;
-    this.selectionBox.style.display = "none";
+    this.isSelecting = false
+    this.selectionBox.style.display = "none"
 
-    const rect = this.canvas.getBoundingClientRect();
-    const endX = e.clientX - rect.left;
-    const endY = e.clientY - rect.top;
+    const rect = this.canvas.getBoundingClientRect()
+    const endX = e.clientX - rect.left
+    const endY = e.clientY - rect.top
 
-    const width = Math.abs(endX - this.startX);
-    const height = Math.abs(endY - this.startY);
+    const width = Math.abs(endX - this.startX)
+    const height = Math.abs(endY - this.startY)
 
     if (width > 50 && height > 50) {
-      const left = Math.min(endX, this.startX);
-      const top = Math.min(endY, this.startY);
-      this.createWindow(left, top, width, height);
+      const left = Math.min(endX, this.startX)
+      const top = Math.min(endY, this.startY)
+      this.createWindow(left, top, width, height)
     }
   }
 
   createWindow(x, y, width, height) {
-    const windowId = "window_" + Date.now();
-    const input = this.currentInput;
+    const windowId = "window_" + Date.now()
+    const input = this.currentInput
 
-    this.inputs[input].windowCount++;
-    const windowNumber = this.inputs[input].windowCount;
+    const backgroundColor = this.inputs[input].color
 
-    const baseColor = this.inputs[input].color || "#000000";
-    const backgroundColor = this.hexToRgba(baseColor, 0.4);
-
-    const windowEl = document.createElement("div");
-    windowEl.className = "window";
-    windowEl.id = windowId;
-    windowEl.style.left = x + "px";
-    windowEl.style.top = y + "px";
-    windowEl.style.width = width + "px";
-    windowEl.style.height = height + "px";
-    windowEl.style.background = backgroundColor;
-    windowEl.style.zIndex = 1000;
-    windowEl.dataset.input = input;
+    const windowEl = document.createElement("div")
+    windowEl.className = "window"
+    windowEl.id = windowId
+    windowEl.style.left = x + "px"
+    windowEl.style.top = y + "px"
+    windowEl.style.width = width + "px"
+    windowEl.style.height = height + "px"
+    windowEl.style.background = backgroundColor
+    windowEl.style.zIndex = 1000
+    windowEl.dataset.input = input
 
     windowEl.innerHTML = `
       <div class="window-header">
@@ -458,144 +412,115 @@ export class WindowCreator {
         </div>
       </div>
       <div class="window-info" id="info_${windowId}"></div>
-      <div class="resize-handle">${windowNumber}</div>
-    `;
-    this.canvas.appendChild(windowEl);
-    this.windows.push(windowId);
-    this.windowCount++;
+      <div class="resize-handle"></div>
+    `
+    this.canvas.appendChild(windowEl)
 
     const windowInfo = {
       id: windowId,
-      number: windowNumber,
+      input: input,
       position: { x, y },
       size: { width, height },
-      virtualPosition: this.calculateVirtualPosition(x, y),
-      virtualSize: this.calculateVirtualSize(width, height),
-    };
+      virtualPosition: calculateVirtualPosition(x, y, this.canvas, this.totalVirtualWidth, this.totalVirtualHeight),
+      virtualSize: calculateVirtualSize(width, height, this.canvas, this.totalVirtualWidth, this.totalVirtualHeight),
+    }
 
-    this.inputs[input].windows.push(windowInfo);
+    this.windows.push(windowInfo)
+    this.inputs[input].windows.push(windowInfo)
 
-    this.updateWindowCount();
-    this.makeDraggable(windowEl);
-    this.makeResizable(windowEl);
-    this.updateWindowInfo(windowEl);
-  }
+    this.updateGlobalWindowNumbers()
+    this.makeDraggable(windowEl)
+    this.makeResizable(windowEl)
+    this.updateWindowInfo(windowEl)
 
-  calculateVirtualPosition(x, y) {
-    const scaleX = this.totalVirtualWidth / this.canvas.clientWidth;
-    const scaleY = this.totalVirtualHeight / this.canvas.clientHeight;
-    return {
-      x: Math.round(x * scaleX),
-      y: Math.round(y * scaleY),
-    };
-  }
-
-  calculateVirtualSize(width, height) {
-    const scaleX = this.totalVirtualWidth / this.canvas.clientWidth;
-    const scaleY = this.totalVirtualHeight / this.canvas.clientHeight;
-    return {
-      width: Math.round(width * scaleX),
-      height: Math.round(height * scaleY),
-    };
+    // No need for separate dragover/drop on windowEl, as canvas drop handles it now
   }
 
   makeDraggable(windowEl) {
-    let isDragging = false;
-    let dragOffsetX = 0;
-    let dragOffsetY = 0;
+    let isDragging = false
+    let dragOffsetX = 0
+    let dragOffsetY = 0
 
     windowEl.addEventListener("mousedown", (e) => {
-      const isCloseBtn = e.target.classList.contains("window-close");
-      const isMaximizeBtn = e.target.classList.contains("window-maximize");
-      const isResizeHandle = e.target.classList.contains("resize-handle");
-      if (isCloseBtn || isMaximizeBtn || isResizeHandle) return;
+      const isControlBtn = e.target.closest(".window-controls") || e.target.classList.contains("resize-handle")
+      if (isControlBtn) return
 
-      isDragging = true;
-      const rect = windowEl.getBoundingClientRect();
-      dragOffsetX = e.clientX - rect.left;
-      dragOffsetY = e.clientY - rect.top;
+      isDragging = true
+      const rect = windowEl.getBoundingClientRect()
+      dragOffsetX = e.clientX - rect.left
+      dragOffsetY = e.clientY - rect.top
 
-      windowEl.style.zIndex = 1000;
-    });
+      windowEl.style.zIndex = 1000
+    })
 
     document.addEventListener("mousemove", (e) => {
-      if (!isDragging) return;
+      if (!isDragging) return
 
-      const canvasRect = this.canvas.getBoundingClientRect();
-      const newX = e.clientX - canvasRect.left - dragOffsetX;
-      const newY = e.clientY - canvasRect.top - dragOffsetY;
+      const canvasRect = this.canvas.getBoundingClientRect()
+      const newX = e.clientX - canvasRect.left - dragOffsetX
+      const newY = e.clientY - canvasRect.top - dragOffsetY
 
-      windowEl.style.left =
-        Math.max(
-          0,
-          Math.min(newX, this.canvas.clientWidth - windowEl.offsetWidth)
-        ) + "px";
-      windowEl.style.top =
-        Math.max(
-          0,
-          Math.min(newY, this.canvas.clientHeight - windowEl.offsetHeight)
-        ) + "px";
-      this.updateWindowInfo(windowEl);
-    });
+      windowEl.style.left = Math.max(0, Math.min(newX, this.canvas.clientWidth - windowEl.offsetWidth)) + "px"
+      windowEl.style.top = Math.max(0, Math.min(newY, this.canvas.clientHeight - windowEl.offsetHeight)) + "px"
+      this.updateWindowInfo(windowEl)
+    })
 
     document.addEventListener("mouseup", () => {
       if (isDragging) {
-        isDragging = false;
-        windowEl.style.zIndex = "auto";
+        isDragging = false
+        windowEl.style.zIndex = "auto"
       }
-    });
+    })
   }
 
   makeResizable(windowEl) {
-    const resizeHandle = windowEl.querySelector(".resize-handle");
-    let isResizing = false;
+    const resizeHandle = windowEl.querySelector(".resize-handle")
+    let isResizing = false
 
     resizeHandle.addEventListener("mousedown", (e) => {
-      isResizing = true;
-      e.stopPropagation();
-    });
+      isResizing = true
+      e.stopPropagation()
+    })
 
     document.addEventListener("mousemove", (e) => {
-      if (!isResizing) return;
+      if (!isResizing) return
 
-      const windowRect = windowEl.getBoundingClientRect();
+      const windowRect = windowEl.getBoundingClientRect()
 
-      const newWidth = e.clientX - windowRect.left;
-      const newHeight = e.clientY - windowRect.top;
+      const newWidth = e.clientX - windowRect.left
+      const newHeight = e.clientY - windowRect.top
 
-      const maxWidth =
-        this.canvas.clientWidth - Number.parseFloat(windowEl.style.left);
-      const maxHeight =
-        this.canvas.clientHeight - Number.parseFloat(windowEl.style.top);
+      const maxWidth = this.canvas.clientWidth - Number.parseFloat(windowEl.style.left)
+      const maxHeight = this.canvas.clientHeight - Number.parseFloat(windowEl.style.top)
 
-      const clampedWidth = Math.min(newWidth, maxWidth);
-      const clampedHeight = Math.min(newHeight, maxHeight);
+      const clampedWidth = Math.min(newWidth, maxWidth)
+      const clampedHeight = Math.min(newHeight, maxHeight)
 
       if (clampedWidth > 150 && clampedHeight > 100) {
-        windowEl.style.width = clampedWidth + "px";
-        windowEl.style.height = clampedHeight + "px";
-        this.updateWindowInfo(windowEl);
+        windowEl.style.width = clampedWidth + "px"
+        windowEl.style.height = clampedHeight + "px"
+        this.updateWindowInfo(windowEl)
       }
-    });
+    })
 
     document.addEventListener("mouseup", () => {
-      isResizing = false;
-    });
+      isResizing = false
+    })
   }
 
   maximizeWindow(windowId) {
-    const windowEl = document.getElementById(windowId);
-    if (!windowEl) return;
+    const windowEl = document.getElementById(windowId)
+    if (!windowEl) return
 
-    const windowRect = windowEl.getBoundingClientRect();
-    const canvasRect = this.canvas.getBoundingClientRect();
+    const windowRect = windowEl.getBoundingClientRect()
+    const canvasRect = this.canvas.getBoundingClientRect()
 
-    const outputs = Array.from(document.querySelectorAll(".output-block"));
+    const outputs = Array.from(document.querySelectorAll(".output-block"))
 
-    const intersectedQuadrants = [];
+    const intersectedQuadrants = []
 
     outputs.forEach((output) => {
-      const outputRect = output.getBoundingClientRect();
+      const outputRect = output.getBoundingClientRect()
 
       if (
         windowRect.right < outputRect.left ||
@@ -603,20 +528,20 @@ export class WindowCreator {
         windowRect.bottom < outputRect.top ||
         windowRect.top > outputRect.bottom
       ) {
-        return;
+        return
       }
 
-      const outputWidth = outputRect.width;
-      const outputHeight = outputRect.height;
-      const quadrantWidth = outputWidth / 2;
-      const quadrantHeight = outputHeight / 2;
+      const outputWidth = outputRect.width
+      const outputHeight = outputRect.height
+      const quadrantWidth = outputWidth / 2
+      const quadrantHeight = outputHeight / 2
 
       for (let row = 0; row < 2; row++) {
         for (let col = 0; col < 2; col++) {
-          const quadrantLeft = outputRect.left + col * quadrantWidth;
-          const quadrantTop = outputRect.top + row * quadrantHeight;
-          const quadrantRight = quadrantLeft + quadrantWidth;
-          const quadrantBottom = quadrantTop + quadrantHeight;
+          const quadrantLeft = outputRect.left + col * quadrantWidth
+          const quadrantTop = outputRect.top + row * quadrantHeight
+          const quadrantRight = quadrantLeft + quadrantWidth
+          const quadrantBottom = quadrantTop + quadrantHeight
 
           if (
             !(
@@ -631,132 +556,131 @@ export class WindowCreator {
               top: quadrantTop,
               right: quadrantRight,
               bottom: quadrantBottom,
-            });
+            })
           }
         }
       }
-    });
+    })
 
-    if (intersectedQuadrants.length === 0) return;
+    if (intersectedQuadrants.length === 0) return
 
-    const minLeft = Math.min(...intersectedQuadrants.map((q) => q.left));
-    const minTop = Math.min(...intersectedQuadrants.map((q) => q.top));
-    const maxRight = Math.max(...intersectedQuadrants.map((q) => q.right));
-    const maxBottom = Math.max(...intersectedQuadrants.map((q) => q.bottom));
+    const minLeft = Math.min(...intersectedQuadrants.map((q) => q.left))
+    const minTop = Math.min(...intersectedQuadrants.map((q) => q.top))
+    const maxRight = Math.max(...intersectedQuadrants.map((q) => q.right))
+    const maxBottom = Math.max(...intersectedQuadrants.map((q) => q.bottom))
 
-    const left = minLeft - canvasRect.left;
-    const top = minTop - canvasRect.top;
-    const width = maxRight - minLeft;
-    const height = maxBottom - minTop;
+    const left = minLeft - canvasRect.left
+    const top = minTop - canvasRect.top
+    const width = maxRight - minLeft
+    const height = maxBottom - minTop
 
-    windowEl.style.left = left + "px";
-    windowEl.style.top = top + "px";
-    windowEl.style.width = width + "px";
-    windowEl.style.height = height + "px";
+    windowEl.style.left = left + "px"
+    windowEl.style.top = top + "px"
+    windowEl.style.width = width + "px"
+    windowEl.style.height = height + "px"
 
-    this.updateWindowInfo(windowEl);
+    this.updateWindowInfo(windowEl)
   }
 
   closeWindow(windowId) {
-    const windowEl = document.getElementById(windowId);
+    const windowEl = document.getElementById(windowId)
     if (windowEl) {
-      const input = windowEl.dataset.input;
+      const windowInfo = this.windows.find((w) => w.id === windowId)
+      if (windowInfo) {
+        // Remove from global windows array
+        this.windows = this.windows.filter((w) => w.id !== windowId)
 
-      this.inputs[input].windows = this.inputs[input].windows.filter(
-        (window) => window.id !== windowId
-      );
-      this.inputs[input].windowCount = this.inputs[input].windows.length;
+        // Remove from specific input's windows array
+        this.inputs[windowInfo.input].windows = this.inputs[windowInfo.input].windows.filter((w) => w.id !== windowId)
+      }
 
-      windowEl.remove();
-      this.windows = this.windows.filter((id) => id !== windowId);
-      this.windowCount--;
-
-      this.updateWindowCount();
+      windowEl.remove()
+      this.updateGlobalWindowNumbers()
     }
   }
 
   clearAllWindows() {
-    this.windows.forEach((id) => {
-      const windowEl = document.getElementById(id);
-      if (windowEl) windowEl.remove();
-    });
-    this.windows = [];
-    this.windowCount = 0;
+    this.windows.forEach((windowInfo) => {
+      const windowEl = document.getElementById(windowInfo.id)
+      if (windowEl) windowEl.remove()
+    })
+    this.windows = []
 
-    document.querySelectorAll(".output-block").forEach((el) => el.remove());
+    document.querySelectorAll(".output-block").forEach((el) => el.remove())
 
     for (const input in this.inputs) {
-      this.inputs[input].windowCount = 0;
-      this.inputs[input].windows = [];
+      this.inputs[input].windows = []
     }
 
-    this.updateWindowCount();
+    this.updateGlobalWindowNumbers()
   }
 
-  updateWindowCount() {
-    const windowCountEl = document.getElementById("windowCount");
-    if (windowCountEl) {
-      windowCountEl.textContent = this.windowCount;
-    }
-  }
-
-  hexToRgba(hex, alpha = 1) {
-    const r = Number.parseInt(hex.slice(1, 3), 16);
-    const g = Number.parseInt(hex.slice(3, 5), 16);
-    const b = Number.parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  updateGlobalWindowNumbers() {
+    this.windows.forEach((windowInfo, index) => {
+      windowInfo.number = index + 1
+      const windowEl = document.getElementById(windowInfo.id)
+      if (windowEl) {
+        windowEl.querySelector(".resize-handle").textContent = windowInfo.number
+      }
+    })
   }
 
   rescaleWindow(windowEl, oldRes, newRes) {
-    const oldVirtual = this.virtualResolutions[oldRes];
-    const newVirtual = this.virtualResolutions[newRes];
+    const oldVirtual = VIRTUAL_RESOLUTIONS[oldRes]
+    const newVirtual = VIRTUAL_RESOLUTIONS[newRes]
 
-    const scaleX = newVirtual.width / oldVirtual.width;
-    const scaleY = newVirtual.height / oldVirtual.height;
+    const scaleX = newVirtual.width / oldVirtual.width
+    const scaleY = newVirtual.height / oldVirtual.height
 
-    const currentLeft = Number.parseFloat(windowEl.style.left);
-    const currentTop = Number.parseFloat(windowEl.style.top);
-    const currentWidth = Number.parseFloat(windowEl.style.width);
-    const currentHeight = Number.parseFloat(windowEl.style.height);
+    const currentLeft = Number.parseFloat(windowEl.style.left)
+    const currentTop = Number.parseFloat(windowEl.style.top)
+    const currentWidth = Number.parseFloat(windowEl.style.width)
+    const currentHeight = Number.parseFloat(windowEl.style.height)
 
-    windowEl.style.left = currentLeft * scaleX + "px";
-    windowEl.style.top = currentTop * scaleY + "px";
-    windowEl.style.width = currentWidth * scaleX + "px";
-    windowEl.style.height = currentHeight * scaleY + "px";
+    windowEl.style.left = currentLeft * scaleX + "px"
+    windowEl.style.top = currentTop * scaleY + "px"
+    windowEl.style.width = currentWidth * scaleX + "px"
+    windowEl.style.height = currentHeight * scaleY + "px"
 
-    this.updateWindowInfo(windowEl);
+    this.updateWindowInfo(windowEl)
   }
 
   updateWindowInfo(windowEl) {
-    const infoEl = windowEl.querySelector(".window-info");
-    if (!infoEl) return;
+    const infoEl = windowEl.querySelector(".window-info")
+    if (!infoEl) return
 
-    const windowLeft = Number.parseFloat(windowEl.style.left);
-    const windowTop = Number.parseFloat(windowEl.style.top);
-    const windowWidth = Number.parseFloat(windowEl.style.width);
-    const windowHeight = Number.parseFloat(windowEl.style.height);
+    const windowLeft = Number.parseFloat(windowEl.style.left)
+    const windowTop = Number.parseFloat(windowEl.style.top)
+    const windowWidth = Number.parseFloat(windowEl.style.width)
+    const windowHeight = Number.parseFloat(windowEl.style.height)
 
-    const virtualPosition = this.calculateVirtualPosition(
+    const virtualPosition = calculateVirtualPosition(
       windowLeft,
-      windowTop
-    );
-    const virtualSize = this.calculateVirtualSize(windowWidth, windowHeight);
+      windowTop,
+      this.canvas,
+      this.totalVirtualWidth,
+      this.totalVirtualHeight,
+    )
+    const virtualSize = calculateVirtualSize(
+      windowWidth,
+      windowHeight,
+      this.canvas,
+      this.totalVirtualWidth,
+      this.totalVirtualHeight,
+    )
 
-    const input = windowEl.dataset.input;
-    const windowId = windowEl.id;
-    const windowInfo = this.inputs[input].windows.find(
-      (w) => w.id === windowId
-    );
+    const windowId = windowEl.id
+    const windowInfo = this.windows.find((w) => w.id === windowId)
     if (windowInfo) {
-      windowInfo.position = { x: windowLeft, y: windowTop };
-      windowInfo.size = { width: windowWidth, height: windowHeight };
-      windowInfo.virtualPosition = virtualPosition;
-      windowInfo.virtualSize = virtualSize;
+      windowInfo.position = { x: windowLeft, y: windowTop }
+      windowInfo.size = { width: windowWidth, height: windowHeight }
+      windowInfo.virtualPosition = virtualPosition
+      windowInfo.virtualSize = virtualSize
     }
 
     infoEl.innerHTML = `
       <div>Pos: ${virtualPosition.x}, ${virtualPosition.y}</div>
       <div>Size: ${virtualSize.width}×${virtualSize.height}</div>
-    `;
+    `
   }
 }
