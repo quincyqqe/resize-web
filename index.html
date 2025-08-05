@@ -21,55 +21,35 @@
         <div class="wall-wrapper">
           <div class="sidebar">
             <div class="tool-group">
-              <h3>Wall Configuration</h3>
-              <select id="virtualSize" class="tool-select">
-                <option value="4k">4K (3840×2160)</option>
-                <option value="2k">2K (2560×1440)</option>
-              </select>
-
-              <div class="wall-config">
-                <div class="config-row">
-                  <label>Rows:</label>
-                  <input
-                    type="number"
-                    id="wallRows"
-                    class="config-input"
-                    min="1"
-                    max="8"
-                    value="1"
-                  />
-                </div>
-                <div class="config-row">
-                  <label>Columns:</label>
-                  <input
-                    type="number"
-                    id="wallCols"
-                    class="config-input"
-                    min="1"
-                    max="8"
-                    value="1"
-                  />
-                </div>
-              </div>
-
-              <div class="outputs-info" id="outputsCount">Outputs: 1/8</div>
-            </div>
-
-            <div class="tool-group">
               <button class="tool-btn" id="clearAll">Reset All</button>
             </div>
-
             <div class="tool-group">
               <h3>Input Selection</h3>
               <div class="input-buttons">
-                <button class="input-btn" data-input="1">Input 1</button>
-                <button class="input-btn" data-input="2">Input 2</button>
-                <button class="input-btn" data-input="3">Input 3</button>
-                <button class="input-btn" data-input="4">Input 4</button>
-                <button class="input-btn" data-input="5">Input 5</button>
-                <button class="input-btn" data-input="6">Input 6</button>
-                <button class="input-btn" data-input="7">Input 7</button>
-                <button class="input-btn" data-input="8">Input 8</button>
+                <button class="input-btn" data-input="1" draggable="true">
+                  Input 1
+                </button>
+                <button class="input-btn" data-input="2" draggable="true">
+                  Input 2
+                </button>
+                <button class="input-btn" data-input="3" draggable="true">
+                  Input 3
+                </button>
+                <button class="input-btn" data-input="4" draggable="true">
+                  Input 4
+                </button>
+                <button class="input-btn" data-input="5" draggable="true">
+                  Input 5
+                </button>
+                <button class="input-btn" data-input="6" draggable="true">
+                  Input 6
+                </button>
+                <button class="input-btn" data-input="7" draggable="true">
+                  Input 7
+                </button>
+                <button class="input-btn" data-input="8" draggable="true">
+                  Input 8
+                </button>
               </div>
             </div>
           </div>
@@ -85,9 +65,62 @@
       </div>
 
       <div class="tab-content" id="system-settings">
-        <div class="placeholder">video wall settings</div>
+        <div class="settings-block">
+          <div class="block-title">Video Wall Setting:</div>
+          <div class="block-row">
+            <div class="block-cell"></div>
+            <div class="block-cell"> <button id="openVideoWallModal" class="tool-btn">
+                Video Wall Setting
+              </button></div>
+            <div class="block-control">
+             
+            </div>
+          </div>
+        </div>
       </div>
     </main>
+
+    <div id="videoWallModal" class="modal hidden">
+      <div class="modal-content">
+        <span id="closeVideoWallModal" class="modal-close">&times;</span>
+        <div class="tool-group">
+          <h3>Wall Configuration</h3>
+          <select id="virtualSize" class="tool-select">
+            <option value="4k">4K (3840×2160)</option>
+            <option value="2k">2K (2560×1440)</option>
+          </select>
+
+          <div class="wall-config">
+            <div class="config-row">
+              <label>Rows:</label>
+              <input
+                type="number"
+                id="wallRows"
+                class="config-input"
+                min="1"
+                max="8"
+                value="1"
+              />
+            </div>
+            <div class="config-row">
+              <label>Columns:</label>
+              <input
+                type="number"
+                id="wallCols"
+                class="config-input"
+                min="1"
+                max="8"
+                value="1"
+              />
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <button id="applySettings" class="tool-btn" style="margin-top: 10px;">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script type="module" src="js/main.js"></script>
   </body>

@@ -17,20 +17,75 @@ document.addEventListener("DOMContentLoaded", () => {
   const resolutionSelect = document.getElementById("virtualSize");
   const rowsInput = document.getElementById("wallRows");
   const colsInput = document.getElementById("wallCols");
-  const outputsInfo = document.getElementById("outputsCount");
 
-  function updateCanvasSize(canvas, virtualWidth, virtualHeight) {
+  const openModalBtn = document.getElementById("openVideoWallModal");
+  const modal = document.getElementById("videoWallModal");
+  const closeModalBtn = document.getElementById("closeVideoWallModal");
+  const applyBtn = document.getElementById("applySettings");
+
+  let lastValidRows = 1;
+  let lastValidCols = 1;
+  let lastValidResolutionKey = "4k";
+
+  openModalBtn.addEventListener("click", () => {
+    modal.classList.remove("hidden");
+  });
+
+  closeModalBtn.addEventListener("click", () => {
+    modal.classList.add("hidden");
+  });
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.classList.add("hidden");
+    }
+  });
+
+  applyBtn.addEventListener("click", () => {
+    const isValid = updateWallConfiguration();
+    if (!isValid)
+      return alert(`Too many outputs. Max allowed is ${MAX_OUTPUTS}.`);
+
+    // ✅ Save to localStorage
+    localStorage.setItem(
+      "videoWallConfig",
+      JSON.stringify({
+        resolution: resolutionSelect.value,
+        rows: rowsInput.value,
+        cols: colsInput.value,
+      })
+    );
+
+    updateCanvasDisplaySize();
+    modal.classList.add("hidden");
+
+    if (document.querySelector(".tab.active").dataset.tab === "video-wall") {
+      windowCreator.redrawWallOutputs();
+      windowCreator.redrawWindows();
+    }
+  });
+
+  function updateCanvasDisplaySize() {
+    const resKey = lastValidResolutionKey;
+    const resolution = virtualResolutions[resKey];
+    const rows = lastValidRows;
+    const cols = lastValidCols;
+
+    const totalVirtualWidth = cols * resolution.width;
+    const totalVirtualHeight = rows * resolution.height;
+
+    const canvas = windowCreator.canvas;
     const container = canvas.parentElement;
     const containerStyles = window.getComputedStyle(canvas);
-    const paddingLeft = parseInt(containerStyles.paddingLeft) || 0;
-    const paddingRight = parseInt(containerStyles.paddingRight) || 0;
-    const paddingTop = parseInt(containerStyles.paddingTop) || 0;
-    const paddingBottom = parseInt(containerStyles.paddingBottom) || 0;
+    const paddingLeft = Number.parseInt(containerStyles.paddingLeft) || 0;
+    const paddingRight = Number.parseInt(containerStyles.paddingRight) || 0;
+    const paddingTop = Number.parseInt(containerStyles.paddingTop) || 0;
+    const paddingBottom = Number.parseInt(containerStyles.paddingBottom) || 0;
 
     const containerWidth = container.clientWidth - paddingLeft - paddingRight;
     const containerHeight = container.clientHeight - paddingTop - paddingBottom;
 
-    const aspectRatio = virtualWidth / virtualHeight;
+    const aspectRatio = totalVirtualWidth / totalVirtualHeight;
     const containerRatio = containerWidth / containerHeight;
 
     let finalWidth, finalHeight;
@@ -47,58 +102,67 @@ document.addEventListener("DOMContentLoaded", () => {
     canvas.style.height = `${finalHeight}px`;
   }
 
-  function updateWallLayout() {
+  function updateWallConfiguration() {
     const resKey = resolutionSelect.value;
     const resolution = virtualResolutions[resKey];
-    const rows = parseInt(rowsInput.value);
-    const cols = parseInt(colsInput.value);
+    const rows = Number.parseInt(rowsInput.value);
+    const cols = Number.parseInt(colsInput.value);
     const totalOutputs = rows * cols;
 
     if (totalOutputs > MAX_OUTPUTS) {
-      outputsInfo.textContent = `Too many outputs (${totalOutputs}/8)`;
-      outputsInfo.style.color = "red";
-      return;
+      return false;
     }
-
-    outputsInfo.textContent = `Outputs: ${totalOutputs}/${MAX_OUTPUTS}`;
-    outputsInfo.style.color = "";
 
     const totalVirtualWidth = cols * resolution.width;
     const totalVirtualHeight = rows * resolution.height;
-    windowCreator.setVirtualSize(totalVirtualWidth, totalVirtualHeight);
 
-    updateCanvasSize(
-      windowCreator.canvas,
-      totalVirtualWidth,
-      totalVirtualHeight
+    windowCreator.setVirtualSize(totalVirtualWidth, totalVirtualHeight);
+    windowCreator.setWallConfig(
+      rows,
+      cols,
+      resolution.width,
+      resolution.height
     );
 
-    windowCreator.clearAllWindows();
+    lastValidRows = rows;
+    lastValidCols = cols;
+    lastValidResolutionKey = resKey;
 
-    const canvas = windowCreator.canvas;
-    const canvasW = canvas.clientWidth;
-    const canvasH = canvas.clientHeight;
-    const scaleX = canvasW / totalVirtualWidth;
-    const scaleY = canvasH / totalVirtualHeight;
-
-    let outputIndex = 1;
-
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const x = col * resolution.width * scaleX;
-        const y = row * resolution.height * scaleY;
-        const w = resolution.width * scaleX;
-        const h = resolution.height * scaleY;
-
-        windowCreator.createOutput(x, y, w, h, outputIndex);
-        outputIndex++;
-      }
-    }
+    return true;
   }
 
-  resolutionSelect.addEventListener("change", updateWallLayout);
-  rowsInput.addEventListener("input", updateWallLayout);
-  colsInput.addEventListener("input", updateWallLayout);
+  function loadSavedWallConfig() {
+    const saved = JSON.parse(localStorage.getItem("videoWallConfig"));
+    if (!saved) return;
 
-  updateWallLayout();
+    resolutionSelect.value = saved.resolution || "4k";
+    rowsInput.value = saved.rows || "1";
+    colsInput.value = saved.cols || "1";
+  }
+
+  loadSavedWallConfig();
+  updateWallConfiguration();
+
+  document.addEventListener("tabActivated", (e) => {
+    if (e.detail === "video-wall") {
+      updateCanvasDisplaySize();
+      windowCreator.redrawWallOutputs();
+      windowCreator.redrawWindows();
+    } else if (e.detail === "system-settings") {
+      updateWallConfiguration();
+    }
+  });
+
+  document.dispatchEvent(
+    new CustomEvent("tabActivated", { detail: "video-wall" })
+  );
+
+  document.getElementById("clearAll").addEventListener("click", () => {
+    windowCreator.clearAllWindows();
+
+    if (document.querySelector(".tab.active").dataset.tab === "video-wall") {
+      windowCreator.redrawWallOutputs();
+      windowCreator.redrawWindows();
+    }
+  });
 });
